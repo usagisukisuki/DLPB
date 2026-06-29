@@ -1,95 +1,47 @@
 # Decoupled Log-Polar Bias for Vision
 
+![Decoupled Log-Polar Bias overview](figs/samune.png)
+
 > 🌐 日本語版: [`README_jp.md`](README_jp.md) ・ English version: this file
 
-> A biologically-inspired positional encoding that extends KERPLE-log to 2D visual inputs.
-> Positional-encoding comparison experiments on ViT-Tiny (multi-dataset).
 
 ---
 
-## Results — CIFAR-100, ViT-Tiny, 300 epochs
-
-| # | Method | Top-1 Acc | vs no_pe | PE params | Notes |
-|---|--------|:---------:|:--------:|:---------:|-------|
-| — | `resnet18` | — | — | — | ResNet baseline (from scratch) |
-| — | `resnet50` | — | — | — | ResNet baseline (from scratch) |
-| 1 | `no_pe` | 63.47% | — | 0 | No positional information |
-| 2 | `ape` | 70.38% | +6.91pp | 12.3K | Learnable absolute PE |
-| 3 | `alibi_2d` | 66.87% | +3.40pp | 0 | Linear distance bias, fixed slopes |
-| 4 | `rpb` | 72.99% | +9.52pp | 8.1K | Swin V1 style, per-layer table |
-| 5 | `cpb` | **76.61%** | +13.14pp | 36.9K | Swin V2 style, MLP |
-| 6 | `rope_2d` | 74.67% | +11.20pp | 0 | RoPE2D baseline |
-| 7 | `kerple_log_2d` | 69.89% | +6.42pp | 72 | Isotropic baseline (KERPLE-log extended to 2D) |
-| 8 | **`dlpb`** | 73.65% | +10.18pp | 180 | **Proposed (anisotropic + per-head scale)** |
-| 9 | **`dlpb_O2`** | 74.78% | +11.31pp | 252 | **Proposed (von Mises 2nd order + scale)** |
-| 10 | **`dlpb_O3`** | 74.30% | +10.83pp | 324 | **Proposed (von Mises 3rd order + scale)** |
-| 11 | **`dlpb_rope_2d`** | 74.26% | +10.79pp | 180 | **Proposed (anisotropic + RoPE2D hybrid)** |
-| 12 | **`dlpb_O2_rope_2d`** | **75.32%** | +11.85pp | 252 | **Proposed (von Mises 2nd order + RoPE2D)** |
-| 13 | **`dlpb_O3_rope_2d`** | 74.68% | +11.21pp | 324 | **Proposed (von Mises 3rd order + RoPE2D)** |
-
-> PE params is the total of PE-module-specific parameters (depth=12 layers × params/layer). `python src/summarize_results.py cifar100` also prints the parameter-count table.
-> The proposed methods are the 6 in rows 8–13 (`dlpb` / `dlpb_O2` / `dlpb_O3` and their `_rope_2d` hybrids).
-> Other explored variants (non-scaled `dlpb_aniso` / `dlpb_vm`, `_sc_fix`, `dlpb_movm`) remain registered in `src/models.py` but are excluded from the default run/summary lists.
-
----
 
 ## Method overview
 
 We inject the **foveated receptive fields** of the biological visual cortex (V1) into the ViT as an attention bias.
 
-### KERPLE-log (`kerple_log_2d`) — isotropic
+### KERPLE-log 2D
 
 $$
-\text{score}(i,j) = \frac{q_i^\top k_j}{\sqrt{d}} - r_1^{(h)} \log\!\left(1 + r_2^{(h)} \|p_j - p_i\|_2\right)
+B_{ij} = - r_1 \log\left(1 + r_2 \|p_j - p_i\|_2\right)
 $$
 
-### Anisotropic (`dlpb`) — adds orientation selectivity
+### Decoupled Log-Polar Bias (DLPB) — adds orientation selectivity
 
 $$
-B_{ij}^{(h)} = -r_1^{(h)} \log\!\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)})
+B_{ij}^{(h)} = -r_1^{(h)} \log\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)})
 $$
 
-### Von Mises 2nd order (`dlpb_O2`) — edge selectivity (180° periodic)
+### DLPB 2nd order — edge selectivity (180° periodic)
 
 $$
-B_{ij}^{(h)} = -r_1^{(h)} \log\!\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)}) + s_2^{(h)} \cos\!\left(2(\phi_{ij} - \phi_2^{*(h)})\right)
+B_{ij}^{(h)} = -r_1^{(h)} \log\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)}) + s_2^{(h)} \cos\!\left(2(\phi_{ij} - \phi_2^{*(h)})\right)
 $$
 
-The 2nd-order term is the 180°-periodic component corresponding to V1 orientation columns (edge/line selectivity).
 
-### Von Mises 3rd order (`dlpb_O3`) — corner selectivity (120° periodic)
+
+### DLPB 3rd order — corner selectivity (120° periodic)
 
 $$
 B_{ij}^{(h)} = \underbrace{-r_1 \log(1+r_2 r)}_{\text{distance decay}} + \underbrace{s_1 \cos(\phi - \phi_1^*)}_{\text{360° direction}} + \underbrace{s_2 \cos 2(\phi - \phi_2^*)}_{\text{180° edge}} + \underbrace{s_3 \cos 3(\phi - \phi_3^*)}_{\text{120° corner}}
 $$
 
-The 3rd-order term captures local structures such as corners and three-way junctions.
+
 
 ---
 
-## DLPB — Decoupled Log-Polar Bias
-
-The proposed methods keep distance and orientation **decoupled** as separate additive terms: a logarithmic distance-decay term plus per-head von Mises angular terms, each scaled by a learnable per-head factor α (see "Method overview" above).
-
-### Variant list
-
-| PE name | Description | params/head |
-|---------|-------------|:-----------:|
-| `dlpb` | anisotropic (additive 1st) + per-head scale — **proposed** | 1.5 |
-| `dlpb_O2` | von Mises 2nd order (additive 1st+2nd) + scale — **proposed** | 2.5 |
-| `dlpb_O3` | von Mises 3rd order (additive 1st+2nd+3rd) + scale — **proposed** | 3.5 |
-| `dlpb_{,_O2,_O3}_rope_2d` | above + RoPE2D hybrid — **proposed** | same |
-
-**Core hypothesis**: the benefit of DLPB is inversely correlated with model scale.
-On small models (ViT-Ti) it yields +3–10% improvement; on large models the effect vanishes.
-
-- $r_1, r_2$: strength/scale of distance decay (per-head learnable, softplus-constrained)
-- $\phi_k^{*(h)}$: preferred direction of head $h$ (learnable)
-- $s_k^{(h)}$: strength of each angular term (learnable, softplus-constrained)
-
-See [`log_polar_bias_for_vision.md`](log_polar_bias_for_vision.md) for details. For the DLPB design discussion, see [`DLPB_ellipse_anisotropy_summary.md`](DLPB_ellipse_anisotropy_summary.md).
-
----
 
 ## Method comparison
 
