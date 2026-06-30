@@ -8,7 +8,7 @@
 ---
 
 
-## Method overview
+## 🧠 Method overview
 
 We inject the **foveated receptive fields** of the biological visual cortex (V1) into the ViT as an attention bias.
 
@@ -27,7 +27,7 @@ $$
 ### DLPB 2nd order — edge selectivity (180° periodic)
 
 $$
-B_{ij}^{(h)} = -r_1^{(h)} \log\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)}) + s_2^{(h)} \cos\!\left(2(\phi_{ij} - \phi_2^{*(h)})\right)
+B_{ij}^{(h)} = -r_1^{(h)} \log\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)}) + s_2^{(h)} \cos\left(2(\phi_{ij} - \phi_2^{*(h)})\right)
 $$
 
 
@@ -35,7 +35,7 @@ $$
 ### DLPB 3rd order — corner selectivity (120° periodic)
 
 $$
-B_{ij}^{(h)} = \underbrace{-r_1 \log(1+r_2 r)}_{\text{distance decay}} + \underbrace{s_1 \cos(\phi - \phi_1^*)}_{\text{360° direction}} + \underbrace{s_2 \cos 2(\phi - \phi_2^*)}_{\text{180° edge}} + \underbrace{s_3 \cos 3(\phi - \phi_3^*)}_{\text{120° corner}}
+B_{ij}^{(h)} = -r_1^{(h)} \log\left(1 + r_2^{(h)} r_{ij}\right) + s_1^{(h)} \cos(\phi_{ij} - \phi_1^{*(h)}) + s_2^{(h)} \cos\left(2(\phi_{ij} - \phi_2^{*(h)})\right) + s_3^{(h)} \cos\left(3(\phi_{ij} - \phi_2^{*(h)})\right)
 $$
 
 
@@ -43,42 +43,27 @@ $$
 ---
 
 
-## Method comparison
+## 📊 Method comparison
 
-| Method | Injection site | Distance dependence | Orientation dependence | Receptive-field shape | Extrapolation | PE params |
-|--------|----------------|---------------------|------------------------|-----------------------|---------------|:---------:|
-| APE | token embedding | none | none | — | low | 12.3K |
-| ALiBi-2D | attention logit | linear (fixed) | none | circle | medium | 0 |
-| RPB | attention logit | learned (table) | learned | arbitrary | low | 8.1K |
-| CPB | attention logit | learned (MLP) | learned | arbitrary | medium | 36.9K |
-| RoPE2D (`rope_2d`) | Q/K rotation | relative rotation | relative rotation | circle | high | 0 |
-| KERPLE-log 2D (`kerple_log_2d`) | attention logit | log | none | circle | high | 72 |
-| **DLPB Aniso (`dlpb`)** | **attention logit** | **log** | **additive 1st** | **heart-shaped** | **high** | **180** |
-| **DLPB VM (`dlpb_O2`)** | **attention logit** | **log** | **additive 1st+2nd** | **approx. ellipse** | **high** | **252** |
-| **DLPB VM3 (`dlpb_O3`)** | **attention logit** | **log** | **additive 1st+2nd+3rd** | **approx. ellipse** | **high** | **324** |
-| **DLPB *`_rope_2d`** | **both (logit + Q/K rotation)** | **log** | **additive + RoPE** | **approx. ellipse** | **high** | **same** |
+| Method | Bias formula | PE params |
+|--------|--------------|:---------:|
+| APE | $x_i + p_i$ (learned, added to tokens) | 12.3K |
+| ALiBi-2D | $B_{ij} = -m\,\lVert p_j - p_i \rVert_2$ | 0 |
+| RPB | $B_{ij} = T[\Delta_{ij}]$ (learned table) | 8.1K |
+| CPB | $B_{ij} = \mathrm{MLP}(\Delta x_{ij}, \Delta y_{ij})$ | 36.9K |
+| RoPE2D (`rope_2d`) | $\langle R_{\theta_i} q_i,\ R_{\theta_j} k_j \rangle$ (Q/K rotation) | 0 |
+| KERPLE-log 2D (`kerple_log_2d`) | $B_{ij} = -r_1 \log(1 + r_2 \lVert p_j - p_i \rVert_2)$ | 72 |
+| **DLPB Aniso (`dlpb`)** | $B_{ij}^{(h)} = -r_1^{(h)}\log(1+r_2^{(h)} r_{ij}) + s_1^{(h)}\cos(\phi_{ij}-\phi_1^{*(h)})$ | **180** |
+| **DLPB VM (`dlpb_O2`)** | $\;\cdots\; + s_2^{(h)}\cos\!\big(2(\phi_{ij}-\phi_2^{*(h)})\big)$ | **252** |
+| **DLPB VM3 (`dlpb_O3`)** | $\;\cdots\; + s_3^{(h)}\cos\!\big(3(\phi_{ij}-\phi_2^{*(h)})\big)$ | **324** |
+| **DLPB *`_rope_2d`** | DLPB logit bias + RoPE2D Q/K rotation (hybrid) | **same** |
 
 > Bold rows are the proposed methods (`dlpb` / `dlpb_O2` / `dlpb_O3` and their RoPE2D hybrids `_rope_2d`).
 > Other explored variants remain registered in `src/models.py` but are excluded from the default comparison list. See the "DLPB" section above.
 
 ---
 
-## Supported datasets
-
-| Dataset | Argument | Image size | Patch | Classes | Acquisition |
-|---------|----------|:----------:|:-----:|:-------:|-------------|
-| CIFAR-100 | `cifar100` | 32×32 | 4×4 | 100 | auto download |
-| ImageNet-100 | `imagenet100` | 224×224 | 16×16 | 100 | manual placement required |
-| Flowers-102 | `flowers102` | 224×224 | 16×16 | 102 | auto download |
-| Stanford Cars | `cars` | 224×224 | 16×16 | 196 | manual placement required ※ |
-| Oxford-IIIT Pets | `pets` | 224×224 | 16×16 | 37 | auto download |
-
-> ※ The official Stanford Cars download link is down, so download it manually (e.g. from Kaggle) and place it under `data/stanford_cars/`.
-> Place ImageNet-100 under `data/imagenet100/train/` and `data/imagenet100/val/` in ImageFolder layout.
-
----
-
-## File layout
+## 📁 File layout
 
 ```
 LPB-V/
@@ -123,7 +108,7 @@ LPB-V/
 
 ---
 
-## Setup
+## ⚙️ Setup
 
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management
 (PyTorch 2.6.0+cu124).
@@ -141,7 +126,20 @@ activate manually. Prefix any command with `uv run` (e.g. `uv run python train.p
 
 ---
 
-## Running experiments
+## 🚀 Running experiments
+
+### Supported datasets
+
+| Dataset | Argument | Image size | Patch | Classes | Acquisition |
+|---------|----------|:----------:|:-----:|:-------:|-------------|
+| CIFAR-100 | `cifar100` | 32×32 | 4×4 | 100 | auto download |
+| ImageNet-100 | `imagenet100` | 224×224 | 16×16 | 100 | manual placement required |
+| Flowers-102 | `flowers102` | 224×224 | 16×16 | 102 | auto download |
+| Stanford Cars | `cars` | 224×224 | 16×16 | 196 | manual placement required ※ |
+| Oxford-IIIT Pets | `pets` | 224×224 | 16×16 | 37 | auto download |
+
+> ※ The official Stanford Cars download link is down, so download it manually (e.g. from Kaggle) and place it under `data/stanford_cars/`.
+> Place ImageNet-100 under `data/imagenet100/train/` and `data/imagenet100/val/` in ImageFolder layout.
 
 ### Run all CIFAR-100 experiments at once (including ResNet baselines)
 
@@ -150,12 +148,33 @@ bash scripts/run_experiments.sh
 # ~6.5 hours on an RTX 4090 (cuda:1)
 ```
 
+### Run all Swin V2-Tiny experiments
+
+The same PE set can be compared on a **Swin V2-Tiny** backbone (scaled-cosine
+attention, residual-post-norm, hierarchical patch merging). The PE bias is
+evaluated on the within-window relative grid; `--pe_type cpb` recovers Swin V2's
+native log-spaced continuous position bias.
+
+```bash
+bash scripts/run_swinv2.sh cifar100 1 300   # dataset gpu epochs
+bash scripts/run_swinv2.sh imagenet100 1 300
+```
+
+Swin results are written to `./results/<dataset>/swinv2_t/<pe_type>/` (isolated
+from the flat ViT layout). Backbone config per resolution: 32px → patch 2 /
+window 4 (grid 16→8→4→2); 224px → patch 4 / window 7 (grid 56→28→14→7); the
+window auto-shrinks to the feature size in deep stages.
+
 ### Single experiment
 
 ```bash
 # ViT + PE method
 uv run python train.py --dataset cifar100   --pe_type dlpb_O2 --gpu 1 --epochs 300
 uv run python train.py --dataset flowers102 --pe_type ape        --gpu 1 --epochs 200
+
+# Swin V2-Tiny + PE method
+uv run python train.py --dataset cifar100   --backbone swinv2_t --pe_type dlpb_O2 --gpu 1 --epochs 300
+uv run python train.py --dataset imagenet100 --backbone swinv2_t --pe_type cpb     --gpu 1 --epochs 300
 
 # ResNet baseline
 uv run python train.py --dataset cifar100   --pe_type resnet18 --gpu 1 --epochs 300
@@ -167,6 +186,7 @@ uv run python train.py --dataset imagenet100 --pe_type resnet50 --gpu 1 --epochs
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--dataset` | `cifar100` | `cifar100 / imagenet100 / flowers102 / cars / pets` |
+| `--backbone` | `vit_tiny` | `vit_tiny / swinv2_t` (swin is incompatible with `resnet*` baselines) |
 | `--pe_type` | `ape` | Proposed: `dlpb / dlpb_O2 / dlpb_O3` (+ `_rope_2d` hybrids)<br>Baselines: `no_pe / ape / alibi_2d / rpb / cpb / rope_2d / kerple_log_2d / resnet18 / resnet50`<br>Explored variants (registered only): `dlpb_aniso / dlpb_vm / dlpb_vm3 / dlpb_ape_vm / *_sc_fix / dlpb_movm*` (+ `_sc`, `_rope_2d`) |
 | `--epochs` | `300` | number of training epochs |
 | `--batch_size` | `256` | batch size |
@@ -178,9 +198,33 @@ uv run python train.py --dataset imagenet100 --pe_type resnet50 --gpu 1 --epochs
 ### Checking results
 
 ```bash
-uv run python src/summarize_results.py              # list available datasets
-uv run python src/summarize_results.py cifar100     # show cifar100 results
+uv run python src/summarize_results.py                          # list available datasets
+uv run python src/summarize_results.py cifar100                 # show cifar100 (ViT) results
+uv run python src/summarize_results.py cifar100 --backbone swinv2_t   # Swin V2-Tiny results
 ```
+
+### Results — Top-1 accuracy (%) across datasets
+
+ViT-Tiny backbone, trained at each dataset's native resolution (300 epochs; CIFAR-100 at 32px, the rest at 224px).
+
+| PE | CIFAR-100 | ImageNet-100 | Flowers-102 | Cars | Pets |
+|----|----------:|-------------:|------------:|-----:|-----:|
+| `no_pe` | 63.47 | 74.60 | 40.98 | 12.60 | 26.60 |
+| `ape` | 70.38 | 76.74 | 40.29 | 15.78 | 27.56 |
+| `alibi_2d` | 66.87 | 76.76 | 41.18 | 13.79 | 27.94 |
+| `rpb` | 72.99 | 78.86 | 38.63 | 13.77 | 27.17 |
+| `cpb` | **76.61** | 80.84 | **42.45** | **26.43** | 34.70 |
+| `rope_2d` | 74.67 | 80.92 | 42.35 | 17.25 | 34.23 |
+| `kerple_log_2d` | 69.89 | 78.44 | 40.69 | 14.90 | 29.08 |
+| **`dlpb`** | 73.65 | 79.46 | 41.37 | 15.51 | 29.60 |
+| **`dlpb_rope_2d`** | 74.26 | **81.30** | 42.06 | 19.65 | 34.07 |
+| **`dlpb_O2`** | 74.78 | 80.18 | 39.41 | 16.14 | 30.96 |
+| **`dlpb_O2_rope_2d`** | 75.32 | 81.20 | 42.06 | 19.35 | **35.30** |
+| **`dlpb_O3`** | 74.30 | 80.24 | 40.49 | 17.42 | 30.53 |
+| **`dlpb_O3_rope_2d`** | 74.68 | 81.26 | **42.45** | 17.35 | 34.83 |
+| `resnet18` (CNN ref.) | — | 82.40 | 57.75 | 74.39 | 70.35 |
+
+> Bold rows are the proposed methods; **bold values** mark the best PE per dataset. `resnet18` is a CNN reference (not a PE method) and is excluded from the per-column best. Regenerate with `uv run python src/summarize_results.py <dataset>`.
 
 ### Resolution-extrapolation evaluation
 
@@ -225,70 +269,14 @@ Main arguments:
 
 > Because DLPB expresses distance decay with functional parameters ($r_1, r_2$, etc.), it generalizes to arbitrary resolutions by buffer recomputation alone.
 
-#### CIFAR-100 example results (Top-1 Acc %)
-
-| PE | 16px | 24px | **32px** | 40px | 48px | 56px | 64px |
-|----|-----:|-----:|---------:|-----:|-----:|-----:|-----:|
-| `no_pe` | 38.3 | 57.1 | 63.5 | 46.2 | 34.3 | 26.1 | 16.5 |
-| `ape` | 46.6 | 64.8 | **70.4** | 56.4 | 44.5 | 37.2 | 27.4 |
-| `alibi_2d` | 41.4 | 60.7 | 66.9 | 50.8 | 39.1 | 31.5 | 22.2 |
-| `rpb` | 47.0 | 66.3 | 73.0 | 57.6 | 45.9 | 38.1 | 28.6 |
-| `cpb` | 45.3 | 70.2 | **76.6** | 64.1 | 55.3 | 48.7 | 35.2 |
-| `kerple_log_2d` | 39.1 | 63.1 | 69.9 | 53.8 | 41.9 | 34.6 | 24.7 |
-| `dlpb_aniso` | 48.0 | 66.9 | 73.4 | 59.5 | 48.5 | 41.3 | 30.5 |
-| `dlpb_vm` | 49.1 | 68.0 | 73.9 | 61.0 | **48.9** | 40.4 | 28.4 |
-| `dlpb_vm3` | **49.7** | **68.1** | 74.1 | 60.6 | 48.5 | 40.2 | 29.3 |
-| `dlpb_ape_vm` | **49.9** | 67.4 | 73.0 | **61.0** | 48.5 | 40.3 | 28.9 |
-
-> The example above uses the previously-explored variants. Bold marks the best value at each resolution. Full results are saved to `results/resolution/{dataset}.json`.
+> Full per-resolution results are saved to `results/resolution/{dataset}.json`.
 
 ---
 
-## Model / training settings
-
-### ViT-Tiny (CIFAR-100)
-
-| Item | Value |
-|------|-------|
-| Input / patch | 32×32 / 4×4 (grid 8×8 = 64 tokens) |
-| Embedding dim | 192 |
-| Depth / heads | 12 / 3 |
-| Pooling | Global Average Pooling |
-| Parameters | ~5.4M |
-
-### ViT-Tiny (224×224 datasets)
-
-| Item | Value |
-|------|-------|
-| Input / patch | 224×224 / 16×16 (grid 14×14 = 196 tokens) |
-| Embedding dim | 192 |
-| Depth / heads | 12 / 3 |
-| Pooling | Global Average Pooling |
-
-### ResNet baselines
-
-| Item | Value |
-|------|-------|
-| Training | from scratch (no pretrained weights) |
-| CIFAR-100 adaptation | change the first conv from 7×7 stride-2 to 3×3 stride-1, replace maxpool with Identity |
-| 224×224 datasets | standard ResNet configuration |
-
-### Training settings (common to all models)
-
-| Item | Value |
-|------|-------|
-| Optimizer | AdamW (β=0.9, 0.999) |
-| LR schedule | Warmup 10 ep → Cosine decay |
-| LR / min LR | 5e-4 / 1e-6 |
-| Weight decay | 0.05 (0 for bias / norm / PE parameters) |
-| Augmentation | CIFAR: RandomCrop + Flip / 224px: RandomResizedCrop + Flip |
-| Mixup | α=0.8 |
-| Label smoothing | 0.1 |
-| Grad clip | max_norm=1.0 |
 
 ---
 
-## References
+## 📚 References
 
 - Chi et al. (2022). **KERPLE**: Kernelized Relative Positional Embedding for Length Extrapolation. *NeurIPS 2022*
 - Press et al. (2022). **ALiBi**: Train Short, Test Long: Attention with Linear Biases. *ICLR 2022*
